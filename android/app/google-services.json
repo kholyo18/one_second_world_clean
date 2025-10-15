@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1049778610899",
+    "project_id": "one-second-world",
+    "storage_bucket": "one-second-world.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1049778610899:android:fb5049c7d41de568d36a26",
+        "android_client_info": {
+          "package_name": "com.example.one_second_world"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyANCfiCxn7ox56PKYekBk4G8R7L5hyAJQI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

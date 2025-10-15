@@ -1,0 +1,70 @@
+name: one_second_world_clean
+description: A Flutter app for recording one second every day 🌍
+publish_to: "none"
+
+
+version: 1.0.0+1
+
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+
+  # أيقونات وأدوات واجهة
+  cupertino_icons: ^1.0.6
+  google_fonts: ^6.2.1
+
+
+  # الكاميرا والصلاحيات والتخزين
+  camera: ^0.10.5+2
+  permission_handler: ^11.3.1
+  path_provider: ^2.1.4
+  shared_preferences: ^2.3.2
+
+
+  # تشغيل الفيديو ومشاركته
+  video_player: ^2.9.1
+  video_thumbnail: ^0.5.3
+  video_compress: ^3.1.3
+  share_plus: ^10.0.2
+
+
+  # Firebase + Auth + Google Sign-In
+  firebase_core: ^3.4.0
+  firebase_auth: ^5.3.0
+  google_sign_in: ^6.2.1
+
+
+  # <<< أُضيف هذا السطر >>>
+  cloud_functions: ^5.6.2
+
+
+  # مزامنة سحابية اختيارية
+  cloud_firestore: ^5.4.4
+  firebase_storage: ^12.3.4
+
+
+  # دعم اللغات والتواريخ
+  flutter_localizations:
+    sdk: flutter
+  intl: 0.20.2
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.2
+
+
+flutter:
+  uses-material-design: true
+
+
+  assets:
+    - assets/icon.png
+    - assets/splash.png
