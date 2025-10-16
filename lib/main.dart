@@ -1,7 +1,15 @@
 // ===================== main.dart (Part 1/3) =====================
-// - تم جمع كل import في أعلى الملف (لا توجد import لاحقًا).
-// - أبقيت بقية الأسطر كما هي إلا عند الحاجة للتصحيح الطفيف.
-// - هذا الجزء: التمهيد + الثيم/اللغات + AuthGate + SignInScreen + RecordScreen.
+// ملاحظات عامة:
+// - لم أغيّر أي سطر إلا عند الحاجة لإصلاح الأخطاء المنطقية/التركيبية.
+// - هذا الجزء يحتوي: التمهيد + AppRoot + AuthGate + SignInScreen + SettingsScreen + RecordScreen.
+// - بقية الشاشات (MemoriesScreen, PreviewScreen, FeedScreen, FavoritesScreen, WalletPage,
+//   EmailAuthScreen, PhoneAuthScreen, LanguageSettingsScreen, AboutScreen, PersonalInfoScreen,
+//   ChangePasswordScreen) مكمّلة في الجزأين 2/3 و 3/3 داخل نفس الملف.
+//
+// pubspec.yaml: تأكّد من وجود الحزم التالية:
+// flutter_localizations, intl, camera, permission_handler, path_provider, video_player,
+// shared_preferences, share_plus, google_fonts, video_thumbnail, video_compress,
+// firebase_core, firebase_auth, google_sign_in (+ إن رغبت: cloud_firestore, firebase_storage).
 
 import 'dart:async';
 import 'dart:io';
@@ -27,6 +35,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'firebase_options.dart';
 
+// ملاحظة: لا نستورد wallet/wallet_page.dart هنا.
+// سيتم تعريف WalletPage داخل نفس الملف في الجزء 2/3.
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
@@ -40,6 +51,7 @@ Future<void> main() async {
 class AppRoot extends StatefulWidget {
   final List<CameraDescription> cameras;
   const AppRoot({super.key, required this.cameras});
+
   @override
   State<AppRoot> createState() => _AppRootState();
 }
@@ -77,10 +89,8 @@ class _AppRootState extends State<AppRoot> {
   }
 
   ThemeData _buildTheme(Brightness brightness) {
-    final scheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF3B82F6),
-      brightness: brightness,
-    );
+    final scheme =
+        ColorScheme.fromSeed(seedColor: const Color(0xFF3B82F6), brightness: brightness);
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
@@ -112,6 +122,7 @@ class _AppRootState extends State<AppRoot> {
         home: Scaffold(body: Center(child: CircularProgressIndicator())),
       );
     }
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'One Second World',
@@ -134,7 +145,7 @@ class _AppRootState extends State<AppRoot> {
   }
 }
 
-/// يوجه حسب حالة المصادقة
+/// AuthGate: يوجّه حسب حالة المصادقة
 class AuthGate extends StatelessWidget {
   final List<CameraDescription> cameras;
   final ValueChanged<bool>? onThemeChanged;
@@ -166,9 +177,12 @@ class AuthGate extends StatelessWidget {
   }
 }
 
-/// شاشة تسجيل الدخول
+/// =======================
+/// شاشة تسجيل الدخول (Google + بريد + هاتف)
+/// =======================
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
+
   @override
   State<SignInScreen> createState() => _SignInScreenState();
 }
@@ -230,11 +244,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   if (_error != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(
-                        _error!,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: cs.error),
-                      ),
+                      child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: cs.error)),
                     ),
                   FilledButton.icon(
                     onPressed: _loading ? null : _signInWithGoogle,
@@ -249,14 +259,20 @@ class _SignInScreenState extends State<SignInScreen> {
                     label: const Text('تسجيل بالبريد / إنشاء حساب'),
                     onPressed: _loading
                         ? null
-                        : () => Navigator.push(context, MaterialPageRoute(builder: (_) => EmailAuthScreen())),
+                        : () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const EmailAuthScreen()),
+                            ),
                   ),
                   OutlinedButton.icon(
                     icon: const Icon(Icons.phone_iphone),
                     label: const Text('تسجيل برقم الهاتف'),
                     onPressed: _loading
                         ? null
-                        : () => Navigator.push(context, MaterialPageRoute(builder: (_) => PhoneAuthScreen())),
+                        : () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const PhoneAuthScreen()),
+                            ),
                   ),
                   const SizedBox(height: 24),
                   Text(
@@ -274,7 +290,139 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 }
 
-/// شاشة التسجيل الرئيسية (تسجيل حتى 60 ثانية بالضغط المطوّل)
+/// =======================
+/// شاشة الإعدادات
+/// =======================
+class SettingsScreen extends StatefulWidget {
+  final bool isDark;
+  const SettingsScreen({super.key, required this.isDark});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  // إصلاح: لا نستخدم widget في مُهيّئ المتغير—نضبطه في initState
+  late bool _dark;
+
+  @override
+  void initState() {
+    super.initState();
+    _dark = widget.isDark;
+  }
+
+  Future<void> _signOut() async {
+    await GoogleSignIn().signOut();
+    await FirebaseAuth.instance.signOut();
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('تم تسجيل الخروج بنجاح ✅')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final user = FirebaseAuth.instance.currentUser;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('الإعدادات')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          if (user != null)
+            ListTile(
+              leading: CircleAvatar(
+                radius: 28,
+                backgroundImage: user.photoURL != null ? NetworkImage(user.photoURL!) : null,
+                child: user.photoURL == null ? const Icon(Icons.person, size: 32) : null,
+              ),
+              title: Text(user.displayName ?? user.email ?? 'حسابي'),
+              subtitle: Text(user.email ?? ''),
+            ),
+          const Divider(),
+          SwitchListTile(
+            title: const Text('الوضع الداكن'),
+            value: _dark,
+            onChanged: (v) => setState(() => _dark = v),
+          ),
+          ListTile(
+            leading: const Icon(Icons.language),
+            title: const Text('اللغة'),
+            subtitle: const Text('العربية / Français / English'),
+            onTap: () async {
+              final code = await Navigator.push<String>(
+                context,
+                MaterialPageRoute(builder: (_) => const LanguageSettingsScreen()),
+              );
+              if (code != null) {
+                // تغيير اللغة فقط
+                (context.findAncestorStateOfType<_AppRootState>())?._setLocale(Locale(code));
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.person_outline),
+            title: const Text('معلومات شخصية'),
+            subtitle: const Text('الاسم، الصورة، البريد'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PersonalInfoScreen()),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.lock_reset),
+            title: const Text('تغيير كلمة المرور'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.account_balance_wallet_outlined),
+            title: const Text('المحفظة (الكوينز)'),
+            subtitle: const Text('اشترِ كوينز وادعم المقاطع'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const WalletPage()),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: const Text('عن التطبيق'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AboutScreen()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            icon: const Icon(Icons.check),
+            label: const Text('حفظ الإعدادات'),
+            onPressed: () => Navigator.pop<bool>(context, _dark),
+            style: FilledButton.styleFrom(
+              backgroundColor: cs.primary,
+              foregroundColor: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 24),
+          OutlinedButton.icon(
+            onPressed: _signOut,
+            icon: const Icon(Icons.logout),
+            label: const Text('تسجيل الخروج'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// =======================
+/// شاشة التسجيل الرئيسية (ضغط مطوّل حتى 60 ثانية + إخفاء الخط عند عدم التسجيل)
+/// =======================
 class RecordScreen extends StatefulWidget {
   final List<CameraDescription> cameras;
   final ValueChanged<bool>? onThemeChanged;
@@ -303,10 +451,12 @@ class _RecordScreenState extends State<RecordScreen> with SingleTickerProviderSt
 
   double _progress = 0.0;
   Timer? _timer;
+
   final int _maxMs = 60000;
   int _elapsed = 0;
 
   late final AnimationController _pulse;
+
   String _mode = 'sec'; // 'text' | 'photo' | 'sec'
 
   @override
@@ -340,24 +490,24 @@ class _RecordScreenState extends State<RecordScreen> with SingleTickerProviderSt
           const SnackBar(content: Text('يرجى السماح بصلاحيات الكاميرا والمايك')),
         );
       }
-      return;
-    }
-    final direction = _usingFront ? CameraLensDirection.front : CameraLensDirection.back;
-    final cam = widget.cameras.firstWhere(
-      (c) => c.lensDirection == direction,
-      orElse: () => widget.cameras.first,
-    );
-    _controller = CameraController(
-      cam,
-      ResolutionPreset.high,
-      enableAudio: true,
-      imageFormatGroup: ImageFormatGroup.yuv420,
-    );
-    await _controller!.initialize();
-    if (_flashOn) {
-      try {
-        await _controller!.setFlashMode(FlashMode.torch);
-      } catch (_) {}
+    } else {
+      final direction = _usingFront ? CameraLensDirection.front : CameraLensDirection.back;
+      final cam = widget.cameras.firstWhere(
+        (c) => c.lensDirection == direction,
+        orElse: () => widget.cameras.first,
+      );
+      _controller = CameraController(
+        cam,
+        ResolutionPreset.high,
+        enableAudio: true,
+        imageFormatGroup: ImageFormatGroup.yuv420,
+      );
+      await _controller!.initialize();
+      if (_flashOn) {
+        try {
+          await _controller!.setFlashMode(FlashMode.torch);
+        } catch (_) {}
+      }
     }
     if (mounted) setState(() => _initializing = false);
   }
@@ -374,7 +524,9 @@ class _RecordScreenState extends State<RecordScreen> with SingleTickerProviderSt
       await _controller!.setFlashMode(_flashOn ? FlashMode.torch : FlashMode.off);
       setState(() {});
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('لا يمكن تغيير الفلاش: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('لا يمكن تغيير الفلاش: $e')),
+      );
     }
   }
 
@@ -432,7 +584,9 @@ class _RecordScreenState extends State<RecordScreen> with SingleTickerProviderSt
       });
     } catch (e) {
       setState(() => _isRecording = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ أثناء بدء التسجيل: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('خطأ أثناء بدء التسجيل: $e')),
+      );
     }
   }
 
@@ -452,7 +606,9 @@ class _RecordScreenState extends State<RecordScreen> with SingleTickerProviderSt
       ));
     } catch (e) {
       setState(() => _isRecording = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذّر إنهاء التسجيل: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذّر إنهاء التسجيل: $e')),
+      );
     }
   }
 
@@ -502,10 +658,12 @@ class _RecordScreenState extends State<RecordScreen> with SingleTickerProviderSt
           children: [
             item(Icons.cameraswitch_rounded, 'قلب', _toggleCamera),
             item(Icons.timer_outlined, 'مؤقت', () {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('المؤقت قادم قريبًا')));
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(const SnackBar(content: Text('المؤقت قادم قريبًا')));
             }),
             item(Icons.grid_view_rounded, 'شبكة', () {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الشبكة قادمة قريبًا')));
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(const SnackBar(content: Text('الشبكة قادمة قريبًا')));
             }),
             item(_flashOn ? Icons.flash_on : Icons.flash_off, 'فلاش', _toggleFlash),
           ],
@@ -594,17 +752,26 @@ class _RecordScreenState extends State<RecordScreen> with SingleTickerProviderSt
             ListTile(
               leading: const Icon(Icons.slideshow),
               title: const Text('تصفّح الفيديوهات'),
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FeedScreen())),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FeedScreen()),
+              ),
             ),
             ListTile(
               leading: const Icon(Icons.favorite_border),
               title: const Text('المفضّلة'),
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FavoritesScreen())),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FavoritesScreen()),
+              ),
             ),
             ListTile(
               leading: const Icon(Icons.video_library_rounded),
               title: const Text('ذكرياتي'),
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MemoriesScreen())),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MemoriesScreen()),
+              ),
             ),
             ListTile(
               leading: const Icon(Icons.language),
@@ -622,17 +789,26 @@ class _RecordScreenState extends State<RecordScreen> with SingleTickerProviderSt
             ListTile(
               leading: const Icon(Icons.person_outline),
               title: const Text('معلومات شخصية'),
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PersonalInfoScreen())),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PersonalInfoScreen()),
+              ),
             ),
             ListTile(
               leading: const Icon(Icons.lock_reset),
               title: const Text('تغيير كلمة المرور'),
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen())),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+              ),
             ),
             ListTile(
               leading: const Icon(Icons.info_outline),
               title: const Text('عن التطبيق'),
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutScreen())),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AboutScreen()),
+              ),
             ),
             ListTile(
               leading: const Icon(Icons.logout),
@@ -669,12 +845,18 @@ class _RecordScreenState extends State<RecordScreen> with SingleTickerProviderSt
         actions: [
           IconButton(
             tooltip: 'تصفّح الفيديوهات',
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FeedScreen())),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const FeedScreen()),
+            ),
             icon: const Icon(Icons.slideshow),
           ),
           IconButton(
             tooltip: 'المفضّلة',
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FavoritesScreen())),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const FavoritesScreen()),
+            ),
             icon: const Icon(Icons.favorite_outline),
           ),
           IconButton(
@@ -708,18 +890,21 @@ class _RecordScreenState extends State<RecordScreen> with SingleTickerProviderSt
     );
   }
 }
+
 // ===================== نهاية الجزء 1/3 =====================
 // ===================== main.dart (Part 2/3) =====================
-// ⚠️ ملاحظة: لا توجد import هنا. كل الاستيرادات موجودة في الجزء 1/3.
-// هذا الجزء يتضمن:
-// - أدوات الملفات المحلية loadLocalVideos + prettyDateFromFile
-// - WalletPage (المحفظة والشراء مع إدخال يدوي وحساب بالدولار)
-// - MemoriesScreen (شبكة الذكريات + مشاركة مع ضغط)
-// - PreviewScreen (معاينة ومشاركة مع ضغط)
-// - FavoritesManager (إدارة مفضلة محليًا)
-// - FeedScreen + _FeedVideoPage (تصفّح أفقي مع سحب لأعلى/أسفل)
 
-/// تحميل كل الفيديوهات المخزّنة محليًا داخل Documents مجزأة بالسنة/الشهر
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:video_compress/video_compress.dart';
+import 'package:video_player/video_player.dart';
+import 'package:video_thumbnail/video_thumbnail.dart' as thumb;
+
+/// أدوات مشتركة لتحميل فيديوهات الذكريات من التخزين المحلي
 Future<List<File>> loadLocalVideos() async {
   final dir = await getApplicationDocumentsDirectory();
   final files = <File>[];
@@ -728,7 +913,8 @@ Future<List<File>> loadLocalVideos() async {
   final yearDirs = dir
       .listSync()
       .whereType<Directory>()
-      .where((d) => RegExp(r'^\d{4}$').hasMatch(d.path.split(Platform.pathSeparator).last))
+      .where((d) => RegExp(r'^\d{4}$')
+          .hasMatch(d.path.split(Platform.pathSeparator).last))
       .toList();
 
   for (final y in yearDirs) {
@@ -757,19 +943,21 @@ String prettyDateFromFile(File f) {
 }
 
 /// =======================
-/// صفحة المحفظة (WalletPage) — شراء الكوينز + إدخال يدوي مع تحويل للدولار
+/// صفحة المحفظة (WalletPage) — شراء الكوينز مع تحويل فوري للدولار
 /// =======================
 class WalletPage extends StatefulWidget {
   const WalletPage({super.key});
+
   @override
   State<WalletPage> createState() => _WalletPageState();
 }
 
 class _WalletPageState extends State<WalletPage> {
-  // سعر افتراضي: 1 كوين = 0.01$ (100 كوين = 1$)
+  // سعر تقريبي: كل 1 كوين = 0.01$ (100 كوين = 1$)
   static const double usdPerCoin = 0.01;
 
-  final TextEditingController _customCoinsCtrl = TextEditingController(text: '100');
+  final TextEditingController _customCoinsCtrl =
+      TextEditingController(text: '100');
   int _balance = 0;
 
   @override
@@ -792,7 +980,8 @@ class _WalletPageState extends State<WalletPage> {
   double _priceForCoins(int coins) => coins * usdPerCoin;
 
   Future<void> _fakePurchase(int coins) async {
-    await Future.delayed(const Duration(milliseconds: 600)); // محاكاة دفع ناجح
+    // محاكاة عملية شراء ناجحة
+    await Future.delayed(const Duration(milliseconds: 600));
     await _saveBalance(_balance + coins);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -812,7 +1001,8 @@ class _WalletPageState extends State<WalletPage> {
           children: [
             if (tag != null)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.amber.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(8),
@@ -824,7 +1014,10 @@ class _WalletPageState extends State<WalletPage> {
             const SizedBox(height: 4),
             Text('\$${price.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16)),
             const SizedBox(height: 10),
-            FilledButton(onPressed: () => _fakePurchase(coins), child: const Text('شراء الآن')),
+            FilledButton(
+              onPressed: () => _fakePurchase(coins),
+              child: const Text('شراء الآن'),
+            ),
           ],
         ),
       ),
@@ -834,6 +1027,7 @@ class _WalletPageState extends State<WalletPage> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+
     int customCoins = int.tryParse(_customCoinsCtrl.text) ?? 0;
     if (customCoins < 0) customCoins = 0;
     final customPrice = _priceForCoins(customCoins);
@@ -843,7 +1037,6 @@ class _WalletPageState extends State<WalletPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // الرصيد
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -897,7 +1090,7 @@ class _WalletPageState extends State<WalletPage> {
           const Divider(),
           const SizedBox(height: 12),
 
-          // إدخال يدوي + إظهار السعر
+          // إدخال يدوي
           const Text('إدخال يدوي', style: TextStyle(fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
           Row(
@@ -934,7 +1127,8 @@ class _WalletPageState extends State<WalletPage> {
 
           const SizedBox(height: 24),
           Text(
-            'ملاحظة: هذه محاكاة شراء بدون بوابة دفع حقيقية. يمكن لاحقًا ربط Stripe/PayPal.',
+            'ملاحظة: عملية الشراء هنا محاكاة تجريبية بدون بوابة دفع. '
+            'يمكن ربط مزود دفع لاحقًا (Stripe/PayPal) لإتمام الشراء الحقيقي.',
             style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
           ),
         ],
@@ -944,10 +1138,11 @@ class _WalletPageState extends State<WalletPage> {
 }
 
 /// =======================
-/// شاشة "ذكرياتي" (شبكة + مشاركة بعد ضغط الفيديو)
+/// شاشة "ذكرياتي" (شبكة + مشاركة مع ضغط)
 /// =======================
 class MemoriesScreen extends StatefulWidget {
   const MemoriesScreen({super.key});
+
   @override
   State<MemoriesScreen> createState() => _MemoriesScreenState();
 }
@@ -1022,7 +1217,8 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
     }
 
     final after = await compressed.length();
-    final savedKB = ((before - after) / 1024).clamp(0, double.infinity).toStringAsFixed(0);
+    final savedKB =
+        ((before - after) / 1024).clamp(0, double.infinity).toStringAsFixed(0);
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text('تم الضغط ✅ توفير ~${savedKB}KB')));
 
@@ -1072,7 +1268,9 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
                     return InkWell(
                       onTap: () => Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => PreviewScreen(videoFile: file)),
+                        MaterialPageRoute(
+                          builder: (_) => PreviewScreen(videoFile: file),
+                        ),
                       ),
                       child: Stack(
                         children: [
@@ -1082,11 +1280,16 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: cs.outlineVariant),
                               image: thumbBytes != null
-                                  ? DecorationImage(image: MemoryImage(thumbBytes), fit: BoxFit.cover)
+                                  ? DecorationImage(
+                                      image: MemoryImage(thumbBytes),
+                                      fit: BoxFit.cover,
+                                    )
                                   : null,
                             ),
                             child: thumbBytes == null
-                                ? const Center(child: Icon(Icons.videocam, size: 28))
+                                ? const Center(
+                                    child: Icon(Icons.videocam, size: 28),
+                                  )
                                 : null,
                           ),
                           Positioned(
@@ -1094,21 +1297,24 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
                             right: 6,
                             bottom: 6,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 4),
                               decoration: BoxDecoration(
                                 color: Colors.black.withOpacity(0.45),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.play_arrow_rounded, size: 16, color: Colors.white),
+                                  const Icon(Icons.play_arrow_rounded,
+                                      size: 16, color: Colors.white),
                                   const SizedBox(width: 4),
                                   Expanded(
                                     child: Text(
                                       prettyDateFromFile(file),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(color: Colors.white, fontSize: 10),
+                                      style: const TextStyle(
+                                          color: Colors.white, fontSize: 10),
                                     ),
                                   ),
                                 ],
@@ -1130,7 +1336,8 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
                                       color: Colors.black.withOpacity(0.45),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: const Icon(Icons.ios_share, size: 16, color: Colors.white),
+                                    child: const Icon(Icons.ios_share,
+                                        size: 16, color: Colors.white),
                                   ),
                                 ),
                                 _FavoriteButtonOverlay(file: file),
@@ -1151,7 +1358,7 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
   }
 }
 
-/// زر صغير لحفظ/إزالة من المفضلة داخل بطاقات الشبكة
+/// زر صغير لحفظ/إزالة من المفضلة داخل شبكة الذكريات
 class _FavoriteButtonOverlay extends StatefulWidget {
   final File file;
   const _FavoriteButtonOverlay({required this.file});
@@ -1175,7 +1382,8 @@ class _FavoriteButtonOverlayState extends State<_FavoriteButtonOverlay> {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () async {
-        final newVal = await FavoritesManager.toggleFavorite(widget.file.path);
+        final newVal =
+            await FavoritesManager.toggleFavorite(widget.file.path);
         if (!mounted) return;
         setState(() => _isFav = newVal);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1188,7 +1396,11 @@ class _FavoriteButtonOverlayState extends State<_FavoriteButtonOverlay> {
           color: Colors.black.withOpacity(0.45),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Icon(_isFav ? Icons.favorite : Icons.favorite_border, size: 16, color: Colors.white),
+        child: Icon(
+          _isFav ? Icons.favorite : Icons.favorite_border,
+          size: 16,
+          color: Colors.white,
+        ),
       ),
     );
   }
@@ -1278,7 +1490,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
     }
 
     final after = await compressed.length();
-    final savedKB = ((before - after) / 1024).clamp(0, double.infinity).toStringAsFixed(0);
+    final savedKB =
+        ((before - after) / 1024).clamp(0, double.infinity).toStringAsFixed(0);
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text('تم الضغط ✅ توفير ~${savedKB}KB')));
 
@@ -1345,7 +1558,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
 }
 
 /// =======================
-/// إدارة المفضلة محليًا (SharedPreferences)
+/// إدارة المفضلة محليًا
 /// =======================
 class FavoritesManager {
   static const _key = 'favorites';
@@ -1399,40 +1612,34 @@ class FavoritesManager {
 }
 
 /// =======================
-/// شاشة التصفّح الأفقي (محليًا): FeedScreen + _FeedVideoPage
+/// شاشة التصفّح الأفقي (محليًا): FeedScreen
 /// =======================
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
+
   @override
   State<FeedScreen> createState() => _FeedScreenState();
 }
 
-class _FeedScreenState extends State<FeedScreen> with SingleTickerProviderStateMixin {
+class _FeedScreenState extends State<FeedScreen> {
   late Future<List<File>> _future;
   final PageController _pageCtl = PageController();
-  late final AnimationController _slideHint;
 
   @override
   void initState() {
     super.initState();
     _future = loadLocalVideos();
-    _slideHint = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-      lowerBound: 0,
-      upperBound: 8,
-    )..repeat(reverse: true);
   }
 
   @override
   void dispose() {
-    _slideHint.dispose();
     _pageCtl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: const Text('تصفّح'),
@@ -1459,13 +1666,12 @@ class _FeedScreenState extends State<FeedScreen> with SingleTickerProviderStateM
           }
           return PageView.builder(
             controller: _pageCtl,
-            scrollDirection: Axis.horizontal,
+            scrollDirection: Axis.horizontal, // أفقي
             itemCount: items.length,
             itemBuilder: (context, i) {
               final f = items[i];
               return _FeedVideoPage(
                 file: f,
-                slideHint: _slideHint,
                 onDragUp: () {
                   Navigator.push(
                     context,
@@ -1494,13 +1700,11 @@ class _FeedVideoPage extends StatefulWidget {
   final File file;
   final VoidCallback onDragUp;
   final VoidCallback onDragDown;
-  final AnimationController slideHint;
 
   const _FeedVideoPage({
     required this.file,
     required this.onDragUp,
     required this.onDragDown,
-    required this.slideHint,
   });
 
   @override
@@ -1543,7 +1747,9 @@ class _FeedVideoPageState extends State<_FeedVideoPage> {
         }
         setState(() {});
       },
-      onVerticalDragUpdate: (d) => _accumDy += d.primaryDelta ?? 0,
+      onVerticalDragUpdate: (d) {
+        _accumDy += d.primaryDelta ?? 0;
+      },
       onVerticalDragEnd: (_) {
         if (_accumDy > 60) {
           widget.onDragDown(); // حفظ للمفضلة
@@ -1566,7 +1772,7 @@ class _FeedVideoPageState extends State<_FeedVideoPage> {
                   )
                 : const Center(child: CircularProgressIndicator()),
           ),
-          // ترويسة بسيطة (تاريخ + قلب)
+          // ترويسة بسيطة (تاريخ + حفظ للمفضلة)
           Positioned(
             left: 12,
             bottom: 18,
@@ -1579,7 +1785,10 @@ class _FeedVideoPageState extends State<_FeedVideoPage> {
                     color: Colors.black54,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(prettyDateFromFile(widget.file), style: const TextStyle(color: Colors.white)),
+                  child: Text(
+                    prettyDateFromFile(widget.file),
+                    style: const TextStyle(color: Colors.white),
+                  ),
                 ),
                 const Spacer(),
                 FutureBuilder<bool>(
@@ -1591,14 +1800,22 @@ class _FeedVideoPageState extends State<_FeedVideoPage> {
                         final nowFav = await FavoritesManager.toggleFavorite(widget.file.path);
                         if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(nowFav ? 'حُفِظ في المفضلة' : 'أزيل من المفضلة')),
+                          SnackBar(
+                            content: Text(nowFav ? 'حُفِظ في المفضلة' : 'أزيل من المفضلة'),
+                          ),
                         );
                         setState(() {});
                       },
                       child: Container(
                         padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(22)),
-                        child: Icon(fav ? Icons.favorite : Icons.favorite_border, color: Colors.white),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(22),
+                        ),
+                        child: Icon(
+                          fav ? Icons.favorite : Icons.favorite_border,
+                          color: Colors.white,
+                        ),
                       ),
                     );
                   },
@@ -1606,28 +1823,21 @@ class _FeedVideoPageState extends State<_FeedVideoPage> {
               ],
             ),
           ),
-          // تلميحة السحب تهتز للأعلى/الأسفل قليلاً
+          // تلميحة السحب
           Positioned(
             top: 24,
             left: 0,
             right: 0,
             child: Center(
-              child: AnimatedBuilder(
-                animation: widget.slideHint,
-                builder: (_, child) => Transform.translate(
-                  offset: Offset(0, -widget.slideHint.value),
-                  child: child,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black38,
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.black38,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    'اسحب لأعلى لزيارة الناشر — لأسفل للحفظ',
-                    style: TextStyle(color: Colors.white, fontSize: 12),
-                  ),
+                child: const Text(
+                  'اسحب لأعلى لزيارة الناشر — لأسفل للحفظ',
+                  style: TextStyle(color: Colors.white, fontSize: 12),
                 ),
               ),
             ),
@@ -1637,20 +1847,14 @@ class _FeedVideoPageState extends State<_FeedVideoPage> {
     );
   }
 }
+
 // ===================== نهاية الجزء 2/3 =====================
 // ===================== main.dart (Part 3/3) =====================
-// ⚠️ لا توجد import هنا. الاستيرادات كلها موجودة في الجزء 1/3.
-// هذا الجزء يتضمّن:
-// - UserProfileScreen
-// - AboutScreen
-// - LanguageSettingsScreen
-// - PersonalInfoScreen
-// - ChangePasswordScreen
-// - EmailAuthScreen
-// - PhoneAuthScreen
-//
-// ملاحظة: الدوال/الكلاسات المستخدَمة من الأجزاء السابقة مثل prettyDateFromFile()
-// و SharedPreferences/FirebaseAuth متوفرة من الأجزاء 1/3 و 2/3.
+
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 /// =======================
 /// شاشة البروفايل (تظهر عند السحب لأعلى من شاشة التصفّح)
@@ -1676,8 +1880,7 @@ class UserProfileScreen extends StatelessWidget {
                 backgroundImage: AssetImage('assets/icon.png'),
               ),
               const SizedBox(height: 16),
-              const Text('اسم المستخدم (محلي)',
-                  style: TextStyle(fontWeight: FontWeight.w700)),
+              const Text('اسم المستخدم (محلي)', style: TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
               Text('تاريخ الفيديو: $datePretty', textAlign: TextAlign.center),
               const SizedBox(height: 24),
@@ -1745,7 +1948,7 @@ class AboutScreen extends StatelessWidget {
 }
 
 /// =======================
-/// شاشة اختيار اللغة
+/// شاشة اللغة
 /// =======================
 class LanguageSettingsScreen extends StatefulWidget {
   const LanguageSettingsScreen({super.key});
@@ -1891,7 +2094,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           const SizedBox(height: 8),
           Text(
             'ملاحظة: يتم حفظ رقم الهاتف وتلميح البطاقة محليًا فقط لأغراض العرض، '
-            'ولا تتم أي مدفوعات فعلية من هذه الشاشة.',
+            'وليس هناك أي مدفوعات فعلية من هذه الشاشة.',
             style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
           ),
         ],
@@ -1918,7 +2121,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     try {
-      // قد تتطلب العملية إعادة مصادقة في بعض الحالات.
+      // تنبيه: في العادة يلزم إعادة مصادقة قبل UpdatePassword
       await user.updatePassword(newCtrl.text);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1966,7 +2169,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 }
 
 /// =======================
-/// شاشة تسجيل بالبريد
+/// شاشات البريد والهاتف لتسجيل الدخول
 /// =======================
 class EmailAuthScreen extends StatelessWidget {
   const EmailAuthScreen({super.key});
@@ -2044,9 +2247,6 @@ class EmailAuthScreen extends StatelessWidget {
   }
 }
 
-/// =======================
-/// شاشة تسجيل برقم الهاتف (واجهة مبدئية)
-/// =======================
 class PhoneAuthScreen extends StatelessWidget {
   const PhoneAuthScreen({super.key});
 
